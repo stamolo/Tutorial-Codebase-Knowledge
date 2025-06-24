@@ -1,10 +1,13 @@
 import os
-import re
+from utils import generate_mermaid_png
+
 import yaml
 from pocketflow import Node, BatchNode
 from utils.crawl_github_files import crawl_github_files
 from utils.call_llm import call_llm
 from utils.crawl_local_files import crawl_local_files
+from utils.mermaid_utils import render_mermaid_blocks
+from pathlib import Path
 
 
 # Helper to get content for specific file indices
@@ -847,32 +850,56 @@ class CombineTutorial(Node):
         return {
             "output_path": output_path,
             "index_content": index_content,
-            "chapter_files": chapter_files,  # List of {"filename": str, "content": str}
+            "chapter_files": chapter_files,  # List[{"filename","content"}]
+            "arch_mermaid": mermaid_diagram,  # ← новая строка
         }
 
     def exec(self, prep_res):
-        output_path = prep_res["output_path"]
-        index_content = prep_res["index_content"]
-        chapter_files = prep_res["chapter_files"]
+        out = Path(prep_res["output_path"])
+        out.mkdir(parents=True, exist_ok=True)
 
-        print(f"Combining tutorial into directory: {output_path}")
-        # Rely on Node's built-in retry/fallback
-        os.makedirs(output_path, exist_ok=True)
+        # ---------- 1. архитектурная схема ----------
+        arch_mmd = out / "diagram.mmd"
+        arch_png = out / "diagram.png"
+        arch_mmd.write_text(prep_res["arch_mermaid"], encoding="utf-8")
+        png_ok = generate_mermaid_png(arch_mmd, arch_png)
+        if png_ok:
+            print(f"  - Generated {arch_png}")
+        else:
+            print("  - Skipped PNG generation for architecture diagram.")
 
-        # Write index.md
-        index_filepath = os.path.join(output_path, "index.md")
-        with open(index_filepath, "w", encoding="utf-8") as f:
-            f.write(index_content)
-        print(f"  - Wrote {index_filepath}")
+        # ---------- 2. формируем index.md ----------
+        index_src = prep_res["index_content"]
 
-        # Write chapter files
-        for chapter_info in chapter_files:
-            chapter_filepath = os.path.join(output_path, chapter_info["filename"])
-            with open(chapter_filepath, "w", encoding="utf-8") as f:
-                f.write(chapter_info["content"])
-            print(f"  - Wrote {chapter_filepath}")
+        if png_ok:
+            # Заменяем ТОЛЬКО первый ```mermaid``` на картинку
+            new, skip, done = [], False, False
+            for ln in index_src.splitlines():
+                if ln.strip().startswith("```mermaid") and not done:
+                    new.append("![Architecture Diagram](diagram.png)")
+                    skip, done = True, True
+                    continue
+                if skip:
+                    if ln.strip().startswith("```"):
+                        skip = False
+                    continue
+                new.append(ln)
+            index_src = "\n".join(new)
 
-        return output_path  # Return the final path
+        # ‼️ Больше НЕ вызываем render_mermaid_blocks для index.md —
+        # второй (и любые последующие) блоки остаются как есть
+        (out / "index.md").write_text(index_src, encoding="utf-8")
+        print(f"  - Wrote {out / 'index.md'}")
+
+        # ---------- 3. главы ----------
+        for ch in prep_res["chapter_files"]:
+            processed = render_mermaid_blocks(
+                ch["content"], out, generate_mermaid_png
+            )
+            (out / ch["filename"]).write_text(processed, encoding="utf-8")
+            print(f"  - Wrote {out / ch['filename']}")
+
+        return str(out)
 
     def post(self, shared, prep_res, exec_res):
         shared["final_output_dir"] = exec_res  # Store the output path
