@@ -10,16 +10,15 @@ from typing import Iterable, Set
 # --- configuration ---------------------------------------------------------
 # «Белый» список исключений: показываем в структуре, но не заходим внутрь и не включаем в контент
 DEFAULT_EXCLUDES: Set[str] = {
+'output', '.env', '.dockerignore', 'README.md'
 
-     'models','reports_ide', 'tests',
-    'meeting_minutes.txt', 'meeting.wav', 'out'
 }
 
 # Чёрный список: полностью игнорируемые элементы
 DEFAULT_BLACKLIST: Set[str] = {
-    '.venv', 'docs', 'assets', '__pycache__', '.idea', '.git','.pytest_cache', 'LICENSE'
+    '.venv', 'docs', 'assets', '__pycache__', '.idea', '.git','.pytest_cache'
     ,'project_dump.txt','.clinerules', '.cursorrules', '.gitignore'
-    ,'.windsurfrules', 'meeting.m4a', 'meeting2.m4a', 'тестовые'
+    ,'.windsurfrules', 'logs', 'llm_cache.json', '.env.sample'
 }
 
 DEFAULT_MAX_BYTES = 1_000_000  # 1 MiB
