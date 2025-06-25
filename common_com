@@ -1,0 +1,3 @@
+python main.py --dir "H:\dart\uni" --include "*.py" --exclude ".venv/*","__pycache__/*",".idea/*",".git/*",".pytest_cache/*","project_dump.txt","tests/*",".gitignore","reports_ide/*","tests/*","frontend/*","ТЗ/*","uni.rar","tests.rar" --language "russian"
+pytest -q
+python project_exporter.py H:\dart\Tutorial-Codebase-Knowledge
